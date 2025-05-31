@@ -25,7 +25,7 @@ def handle_hello():
     return jsonify(response_body), 200
 
 
-@api.route('/user', methods=['POST'])
+@api.route('/signup', methods=['POST'])
 def register_user():
 
     body = request.get_json(silent=True)
@@ -33,14 +33,14 @@ def register_user():
     if body is None:
         return {"message": "Debes enviarme el body"}, 404
 
-    if 'email' not in body or 'password' not in body or 'name' not in body:
+    if 'email' not in body or 'password' not in body:
         return {"message": "Datos incompletos"}, 404
     
     if db.session.execute(select(User).where(User.email == body['email'])).scalar_one_or_none() is not None:
         return {"message": "El email ya está registrado"}, 409
     
-    hashed_password = generate_password_hash(body['password'], method='sha256')
-    new_user = User(email=body['email'], password=hashed_password, name=body['name'])
+    hashed_password = generate_password_hash(body['password'])
+    new_user = User(email=body['email'], password=hashed_password, is_active=True)
     
     db.session.add(new_user)
     db.session.commit()
@@ -59,8 +59,27 @@ def login_user():
 
     user = db.session.execute(select(User).where(User.email == body['email'])).scalar_one_or_none()
 
-    if user is None or not check_password_hash(user.password, body['password']):
+    if not check_password_hash(user.password, body['password']):
         return {"message": "Credenciales incorrectas"}, 401
 
-    access_token = create_access_token(identity = user.id)
+    access_token = create_access_token(identity = str (user.id))
     return jsonify({ "token": access_token, "user_id": user.id })
+
+@api.route('/private', methods=['GET'])
+@jwt_required()
+def private_route():
+    current_user_id = get_jwt_identity()
+    user = db.session.execute(select(User).where(User.id == current_user_id)).scalar_one_or_none()
+
+    if user is None:
+        return {"message": "Usuario no encontrado"}, 404
+
+    return jsonify({"message": f"Bienvenido, {user.email}"}), 200
+
+@api.route('/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    users = db.session.execute(select(User)).scalars().all()
+    return jsonify([user.serialize() for user in users]), 200 
+# Para que funcione con con el jwt debe llamarse como objeto el jsonify
+    
