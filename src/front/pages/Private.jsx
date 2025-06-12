@@ -42,7 +42,7 @@ export const Private = () => {
 
     useEffect(() => {
         if (!localStorage.getItem("token")) {
-            navigate("/login");
+            navigate("/login");  // esta linea se podria colocar la linea 50 y eliminar el useEffect?
         }
     }, [navigate]);
 
